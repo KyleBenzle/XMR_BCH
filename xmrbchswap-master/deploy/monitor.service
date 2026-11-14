@@ -1,0 +1,16 @@
+[Unit]
+Description=XMR BCH Swap deposit monitor
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/xmrbchswap/xmrbchswap-master
+EnvironmentFile=/opt/xmrbchswap/xmrbchswap-master/.env
+ExecStart=/opt/xmrbchswap/xmrbchswap-master/.venv/bin/python manage.py monitor
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

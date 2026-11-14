@@ -1,0 +1,15 @@
+[Unit]
+Description=XMRTo.Cash Monero wallet RPC
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=@APP_USER@
+WorkingDirectory=@APP_DIR@
+ExecStart=@APP_DIR@/start_xmr_wallet.sh
+Restart=always
+RestartSec=15
+TimeoutStopSec=60
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,28 @@
+# XMRTo.Cash — Apache glue for running from public_html/XMRBCH/
+#
+# Forwards every request for this folder to the app (gunicorn on 127.0.0.1:8077).
+# No file in this folder is ever served directly, so .env, wallet files and
+# the database stay private.
+#
+# Needs: a2enmod rewrite proxy proxy_http headers   and   AllowOverride All
+# (install.sh checks this). The folder name must match URL_PREFIX in .env.
+
+Options -Indexes
+DirectorySlash On
+
+# If the proxy modules are missing, refuse everything rather than serve files.
+<IfModule !mod_rewrite.c>
+    Require all denied
+</IfModule>
+<IfModule !mod_proxy_http.c>
+    Require all denied
+</IfModule>
+
+<IfModule mod_headers.c>
+    RequestHeader set X-Forwarded-Proto "https" env=HTTPS
+</IfModule>
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^ http://127.0.0.1:8077%{REQUEST_URI} [P,L]
+</IfModule>

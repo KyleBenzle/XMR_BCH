@@ -1,0 +1,13 @@
+[Unit]
+Description=XMRTo.Cash website (gunicorn)
+After=network.target
+
+[Service]
+User=@APP_USER@
+WorkingDirectory=@APP_DIR@
+ExecStart=@APP_DIR@/.venv/bin/gunicorn --workers 2 --bind 127.0.0.1:@WEB_PORT@ --access-logfile - xmrbchswap.wsgi:application
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

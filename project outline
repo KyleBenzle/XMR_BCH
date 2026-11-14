@@ -1,0 +1,110 @@
+XMRTo.Cash — Project Outline
+
+Purpose
+A simple, non-custodial BCH ↔ XMR swap service. Users send one coin, receive the other. The service holds hot wallets for both sides and auto-executes swaps when deposits arrive.
+
+Current Stack
+- Backend: Django (project: xmrbchswap) with a single app: main
+- Frontend: Django template + static JS/CSS (no separate frontend build)
+- Database: SQLite (db.sqlite3)
+- Background worker: Django management command (monitor)
+- Wallets/price sources: monero-wallet-rpc, bitcash, Blockchair API, CoinGecko API
+
+Repository Layout (active parts)
+- xmrbchswap-master/ : the app root
+- xmrbchswap-master/xmrbchswap/ : Django project settings and URL routing
+- xmrbchswap-master/main/ : main app (models, views, utils, management commands)
+- xmrbchswap-master/main/templates/index.html : UI template
+- xmrbchswap-master/main/static/main/app.js : UI behavior + API calls
+- xmrbchswap-master/main/static/main/index.css : styling
+- xmrbchswap-master/config.py : app config sourced from environment variables
+- xmrbchswap-master/.env.example : env template for local or deploy
+- xmrbchswap-master/start_xmr_wallet.sh : helper to start monero-wallet-rpc
+- xmrbchswap-master/deploy/ : gunicorn, nginx, systemd templates
+
+High-Level Flow
+1. User opens the home page (/) and sees a swap form.
+2. Frontend calls GET /api/rates/ to show rates and available balances.
+3. User submits swap form to POST /api/swap/init/ with amount and receiving address.
+4. Backend creates a Swap row and returns a deposit address to the user.
+5. Background monitor (python manage.py monitor) checks deposits.
+6. When deposit is detected, the monitor sends the output coin and marks swap complete.
+7. Frontend polls GET /api/swap/<swap_id>/ to show status updates.
+
+Business Logic (as desired)
+- Keep everything simple and robust for now.
+- Users choose BCH→XMR or XMR→BCH.
+- We generate a unique deposit address and display it with an order number.
+- We wait for the first deposit to show up.
+- We compute the conversion using current spot price, subtract 5% fee, and send the other coin.
+- The UI should show notifications: waiting for deposit, deposit received, sending, complete.
+
+Key Data Model
+Model: main.models.Swap
+Fields (conceptual)
+- swap_id: public UUID
+- direction: bch_to_xmr or xmr_to_bch
+- deposit_address: where user sends funds
+- deposit_private_key: BCH WIF for per-swap deposit address
+- xmr_subaddress_index: index for Monero subaddress
+- receiving_address: user output address
+- deposit_amount_expected, deposit_amount_received
+- send_amount, rate
+- status: pending, received, sending, complete, expired, failed
+- timestamps and tx hashes
+
+API Endpoints
+- GET /api/rates/ : returns spot/our rates and wallet balances
+- POST /api/swap/init/ : creates swap and returns deposit instructions
+- GET /api/swap/<swap_id>/ : swap status for polling
+
+Wallet and Exchange Logic
+- BCH addresses are generated per-swap using bitcash.
+- BCH balance checks use Blockchair API.
+- BCH payouts are sent from the operational BCH wallet (BCH_OPERATIONAL_WIF).
+- XMR deposits use monero-wallet-rpc subaddresses.
+- XMR payouts use monero-wallet-rpc transfer.
+- Rates are derived from CoinGecko spot prices with a fee percent.
+
+Configuration
+Primary settings live in xmrbchswap-master/config.py and are supplied via env.
+Important env vars (see .env.example)
+- TESTNET (true/false)
+- XMR_NETWORK (stagenet/mainnet)
+- BCH_OPERATIONAL_WIF
+- XMR_RPC_HOST, XMR_RPC_PORT, XMR_RPC_USER, XMR_RPC_PASS
+- FEE_PERCENT, MIN_BCH, MIN_XMR, SWAP_EXPIRY_HOURS
+- BCH_MIN_CONFIRMATIONS, XMR_MIN_CONFIRMATIONS
+- DJANGO_* security settings for production
+
+Operational Pieces
+- App server: runserver for dev, gunicorn for prod
+- Monitor: python manage.py monitor (polls and executes swaps)
+- Monero wallet RPC: started by start_xmr_wallet.sh
+- Static files: collected into STATIC_ROOT for nginx in production
+- Logging: JSON Lines in transactions_log.json
+
+Testing Goals (current plan)
+- Keep test environment on testnet/stagenet.
+- Later: run on mainnet locally with small deposits for end-to-end testing.
+
+Assumptions and Limits
+- Keep the system lightweight and simple.
+- No strict address validation for now (may be added later).
+- Polling-based deposit detection (no webhook or queue).
+- SQLite only by default.
+
+Order Number
+- Use short format: YYYYMMDDHHMMSS_<last6_of_address>
+- Source: time when deposit address is generated.
+- Notification wording and steps in the UI (match desired business logic).
+
+How to Run (short)
+1. Set env vars in .env and export them.
+2. Run monero-wallet-rpc (start_xmr_wallet.sh).
+3. Run migrations and start the Django server.
+4. Run the monitor command in a separate process.
+
+Reference Files
+- xmrbchswap-master/SETUP.md : full local setup instructions
+- xmrbchswap-master/deploy/DEPLOY_MAINNET.md : production deployment steps
